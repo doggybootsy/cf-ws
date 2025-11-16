@@ -17,7 +17,10 @@
 		<script>
 			const ws = new WebSocket("/ws");
 
-			submit.onclick = () => ws.send(input.value);
+			submit.onclick = () => {
+				chat.innerHTML += "<div>" + new Option(input.value).textContent + "</div>";
+				ws.send(input.value);
+			}
 
 			ws.addEventListener("message", e => {
 				chat.innerHTML += "<div>" + new Option(e.data).textContent + "</div>";
