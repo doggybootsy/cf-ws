@@ -6,26 +6,21 @@
 		<title>Hello, World!</title>
 	</head>
 	<body>
-		<h1 id="heading"></h1>
-		<p>This page comes from a static asset stored at `public/index.html` as configured in `wrangler.jsonc`.</p>
-		<button id="button" type="button">Fetch a random UUID</button>
-		<output id="random" for="button"></output>
-		<script>
-			fetch('/message')
-				.then((resp) => resp.text())
-				.then((text) => {
-					const h1 = document.getElementById('heading');
-					h1.textContent = text;
-				});
+		<div>
+			<textarea type="text" name="input" id="input" placeholder="chat here"></textarea>
+			<button type="button" id="submit">Submit</button>
+		</div>
+		<div id="chat">
 
-			const button = document.getElementById("button");
-			button.addEventListener("click", () => {
-				fetch('/random')
-					.then((resp) => resp.text())
-					.then((text) => {
-						const random = document.getElementById('random');
-						random.textContent = text;
-					});
+		</div>
+
+		<script>
+			const ws = new WebSocket("/ws");
+
+			submit.onclick = () => ws.send(input.value);
+
+			ws.addEventListener("message", e => {
+				chat.innerHTML += "<div>" + new Option(e.data).textContent + "</div>";
 			});
 		</script>
 	</body>
