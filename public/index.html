@@ -20,6 +20,7 @@
 			submit.onclick = () => {
 				chat.innerHTML += "<div>" + new Option(input.value).textContent + "</div>";
 				ws.send(input.value);
+				input.value = "";
 			}
 
 			ws.addEventListener("message", e => {
