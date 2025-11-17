@@ -50,10 +50,18 @@ export class ChatRoom {
 
 		this.clients.push(data);
 
+		const refresh = () => {
+			for (const ws of this.clients) {
+				ws.client.send(JSON.stringify({ type: 'list', data: this.clients.map(x => x.name) }));
+			}
+		};
+
+		refresh();
+
 		server.addEventListener('message', e => {
 			const rawData = e.data;
 
-			let parsed = JSON.parse(rawData)
+			let parsed = JSON.parse(rawData);
 
 			if (parsed?.type === 'message') {
 				const foundClient = this.clients.find(x => x.client === server);
@@ -73,6 +81,8 @@ export class ChatRoom {
 				if (foundClient) {
 					foundClient.name = parsed.data;
 				}
+
+				refresh()
 			}
 		});
 
