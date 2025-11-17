@@ -26,7 +26,7 @@
 
 			submit_name.onclick = () => {
 				ws.send( JSON.stringify({type: "change_name", data: input_name.value}))
-				input.value = "";
+				input_name.value = "";
 			}
 
 			ws.addEventListener("message", e => {
