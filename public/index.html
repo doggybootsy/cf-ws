@@ -3,28 +3,46 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Hello, World!</title>
+		<title>Websocket Chat</title>
 	</head>
 	<body>
 		<div>
-			<textarea type="text" name="input" id="input" placeholder="chat here"></textarea>
-			<button type="button" id="submit">Submit</button>
-		</div>
-		<div id="chat">
+			<div style="display: flex">
+				<textarea type="text" name="input" id="input" placeholder="chat here"></textarea>
+				<button type="button" id="submit">Submit</button>
+				<textarea type="text" name="input_name" id="input_name" placeholder="name here"></textarea>
+				<button type="button" id="submit_name">Change Name</button>
 
+				<div id="members">
+					Members:
+				</div>
+			</div>
+			<div id="chat">
+
+			</div>
 		</div>
 
 		<script>
 			const ws = new WebSocket("/ws");
 
 			submit.onclick = () => {
-				chat.innerHTML += "<div>" + new Option(input.value).textContent + "</div>";
-				ws.send(input.value);
+				ws.send(JSON.stringify({type: "message", data: input.value}));
 				input.value = "";
 			}
 
+			submit_name.onclick = () => {
+				ws.send( JSON.stringify({type: "change_name", data: input_name.value}))
+				input_name.value = "";
+			}
+
 			ws.addEventListener("message", e => {
-				chat.innerHTML += "<div>" + new Option(e.data).textContent + "</div>";
+				const data = JSON.parse(e.data);
+				if (data.type === 'message') {
+					chat.innerHTML += "<div>" + data.name + ": " + new Option(data.data).innerHTML + "</div>";
+				}
+				if (data.type === 'list') {
+					members.innerHTML = data.data.join(", ");
+				}
 			});
 		</script>
 	</body>
