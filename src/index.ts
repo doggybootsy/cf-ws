@@ -15,20 +15,25 @@ export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
 		switch (url.pathname) {
-			case "/ws": {
-				const id = env.CHAT.idFromName("room");
+			case '/ws': {
+				const id = env.CHAT.idFromName('room');
 				const stub = env.CHAT.get(id);
 				return stub.fetch(request);
 			}
 			default:
-				return new Response("Not Found", { status: 404 });
+				return new Response('Not Found', { status: 404 });
 		}
-	},
+	}
 } satisfies ExportedHandler<Env>;
+
+interface ClientData {
+	name: string;
+	client: WebSocket;
+}
 
 export class ChatRoom {
 	private state: DurableObjectState;
-	private clients: WebSocket[];
+	private clients: ClientData[];
 
 	constructor(state: DurableObjectState) {
 		this.state = state;
@@ -41,16 +46,38 @@ export class ChatRoom {
 		const server = pair[1];
 
 		server.accept();
-		this.clients.push(server);
+		const data: ClientData = { name: crypto.randomUUID(), client: server };
 
-		server.addEventListener("message", e => {
-			for (const ws of this.clients) {
-				if (ws !== server) ws.send(e.data);
+		this.clients.push(data);
+
+		server.addEventListener('message', e => {
+			const rawData = e.data;
+
+			let parsed = JSON.parse(rawData)
+
+			if (parsed?.type === 'message') {
+				const foundClient = this.clients.find(x => x.client === server);
+				const messageData = {
+					type: 'message',
+					name: foundClient?.name || 'Anonymous',
+					data: parsed.data
+				};
+
+				this.clients.forEach(ws => {
+					ws.client.send(JSON.stringify(messageData));
+				});
+			}
+
+			if (parsed?.type === 'change_name') {
+				const foundClient = this.clients.find(x => x.client === server);
+				if (foundClient) {
+					foundClient.name = parsed.data;
+				}
 			}
 		});
 
-		server.addEventListener("close", () => {
-			this.clients = this.clients.filter(ws => ws !== server);
+		server.addEventListener('close', () => {
+			this.clients = this.clients.filter(ws => ws.client !== server);
 		});
 
 		return new Response(null, {

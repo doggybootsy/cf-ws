@@ -8,7 +8,9 @@
 	<body>
 		<div>
 			<textarea type="text" name="input" id="input" placeholder="chat here"></textarea>
+			<textarea type="text" name="input_name" id="input_name" placeholder="name here"></textarea>
 			<button type="button" id="submit">Submit</button>
+			<button type="button" id="submit_name">Change Name</button>
 		</div>
 		<div id="chat">
 
@@ -18,13 +20,20 @@
 			const ws = new WebSocket("/ws");
 
 			submit.onclick = () => {
-				chat.innerHTML += "<div>" + new Option(input.value).textContent + "</div>";
-				ws.send(input.value);
+				ws.send(JSON.stringify({type: "message", data: input.value}));
+				input.value = "";
+			}
+
+			submit_name.onclick = () => {
+				ws.send( JSON.stringify({type: "change_name", data: input_name.value}))
 				input.value = "";
 			}
 
 			ws.addEventListener("message", e => {
-				chat.innerHTML += "<div>" + new Option(e.data).textContent + "</div>";
+				const data = JSON.parse(e.data);
+				if (data.type === 'message') {
+					chat.innerHTML += "<div>" + data.name + ": " + new Option(data.data).innerHTML + "</div>";
+				}
 			});
 		</script>
 	</body>
