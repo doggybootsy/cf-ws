@@ -11,14 +11,22 @@
 		"bindings": [
 			{
 				"name": "CHAT",
-				"class_name": "ChatRoom"
+				"class_name": "Websocket"
 			}
 		]
 	},
+	"r2_buckets": [
+		{
+			"binding": "bucket",
+			"bucket_name": "bucket"
+		}
+	],
 	"migrations": [
 		{
 			"tag": "v1",
-			"new_sqlite_classes": ["ChatRoom"]
+			"new_sqlite_classes": [
+				"Websocket"
+			]
 		}
 	],
 	"compatibility_flags": [

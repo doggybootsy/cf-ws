@@ -11,6 +11,8 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+import { getBuilds, getStoredBuilds, saveBuild } from './events/plugin';
+
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
@@ -27,11 +29,12 @@ export default {
 } satisfies ExportedHandler<Env>;
 
 interface ClientData {
-	name: string;
+	name?: string;
+	from: "plugin" | "unknown";
 	client: WebSocket;
 }
 
-export class ChatRoom {
+export class Websocket {
 	private state: DurableObjectState;
 	private clients: ClientData[];
 
@@ -45,50 +48,34 @@ export class ChatRoom {
 		const client = pair[0];
 		const server = pair[1];
 
+		const params = new URL(request.url).searchParams;
+		const fromParam = params.get('from');
+		const from: "plugin" | "unknown" = fromParam === "plugin" ? "plugin" : "unknown";
+
+		if (from == "unknown") {
+			return new Response(null, {
+				status: 400,
+			});
+		}
+
 		server.accept();
-		const data: ClientData = { name: crypto.randomUUID(), client: server };
 
-		this.clients.push(data);
+		if (from == "plugin")
+		{
+			const clientData = JSON.stringify(await getStoredBuilds())
+			server.send(clientData)
+		}
 
-		const refresh = () => {
-			for (const ws of this.clients) {
-				ws.client.send(JSON.stringify({ type: 'list', data: this.clients.map(x => x.name) }));
+		this.clients.push({ from, client: server });
+
+		/*server.addEventListener('message', async (event) => {
+			const rawData = event.data;
+			const parsed = JSON.parse(rawData);
+
+			/*if (parsed?.type == "builds") {
+				server.send(JSON.stringify({ type: "builds", data: await getBuilds(parsed?.page || 1, parsed?.limit || 100) }));
 			}
-		};
-
-		refresh();
-
-		server.addEventListener('message', e => {
-			const rawData = e.data;
-
-			let parsed = JSON.parse(rawData);
-
-			if (parsed?.type === 'message') {
-				const foundClient = this.clients.find(x => x.client === server);
-				const messageData = {
-					type: 'message',
-					name: foundClient?.name || 'Anonymous',
-					data: parsed.data
-				};
-
-				this.clients.forEach(ws => {
-					ws.client.send(JSON.stringify(messageData));
-				});
-			}
-
-			if (parsed?.type === 'change_name') {
-				const foundClient = this.clients.find(x => x.client === server);
-				if (foundClient) {
-					foundClient.name = parsed.data;
-				}
-
-				refresh()
-			}
-		});
-
-		server.addEventListener('close', () => {
-			this.clients = this.clients.filter(ws => ws.client !== server);
-		});
+		})*/
 
 		return new Response(null, {
 			status: 101,
@@ -96,3 +83,47 @@ export class ChatRoom {
 		});
 	}
 }
+
+/*const data: ClientData = { name: crypto.randomUUID(), client: server };
+
+this.clients.push(data);
+
+const refresh = () => {
+	for (const ws of this.clients) {
+		ws.client.send(JSON.stringify({ type: 'list', data: this.clients.map(x => x.name) }));
+	}
+};
+
+refresh();
+
+server.addEventListener('message', e => {
+	const rawData = e.data;
+
+	let parsed = JSON.parse(rawData);
+
+	if (parsed?.type === 'message') {
+		const foundClient = this.clients.find(x => x.client === server);
+		const messageData = {
+			type: 'message',
+			name: foundClient?.name || 'Anonymous',
+			data: parsed.data
+		};
+
+		this.clients.forEach(ws => {
+			ws.client.send(JSON.stringify(messageData));
+		});
+	}
+
+	if (parsed?.type === 'change_name') {
+		const foundClient = this.clients.find(x => x.client === server);
+		if (foundClient) {
+			foundClient.name = parsed.data;
+		}
+
+		refresh()
+	}
+});
+
+server.addEventListener('close', () => {
+	this.clients = this.clients.filter(ws => ws.client !== server);
+});*/

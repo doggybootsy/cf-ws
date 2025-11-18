@@ -3,29 +3,20 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Websocket Chat</title>
+		<title>WS</title>
 	</head>
 	<body>
-		<div>
-			<div style="display: flex">
-				<textarea type="text" name="input" id="input" placeholder="chat here"></textarea>
-				<button type="button" id="submit">Submit</button>
-				<textarea type="text" name="input_name" id="input_name" placeholder="name here"></textarea>
-				<button type="button" id="submit_name">Change Name</button>
 
-				<div id="members">
-					Members:
-				</div>
-			</div>
-			<div id="chat">
-
-			</div>
-		</div>
+		<div>The answer for life the universe and everything is: 42</div>
 
 		<script>
-			const ws = new WebSocket("/ws");
+			const ws = new WebSocket("/ws?from=plugin");
 
-			submit.onclick = () => {
+			// window.yes = () => ws.send(JSON.stringify({type: "builds", data: {limit: 10, page: 0}}))
+
+			ws.onmessage = (event) => console.log(JSON.parse(event.data))
+
+			/*submit.onclick = () => {
 				ws.send(JSON.stringify({type: "message", data: input.value}));
 				input.value = "";
 			}
@@ -43,7 +34,7 @@
 				if (data.type === 'list') {
 					members.innerHTML = data.data.join(", ");
 				}
-			});
+			});*/
 		</script>
 	</body>
 </html>
