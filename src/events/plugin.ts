@@ -1,6 +1,6 @@
 import { env } from 'cloudflare:workers';
 
-const fileName = 'builds.json';
+const fileName = 'hashes.json';
 const DISCORD_APP = `https://canary.discord.com/app`;
 const DISCORD_PATH = `https://canary.discord.com`;
 const DISCORD_SCRIPTS = /script\s+\w+\s+src="(.*?)"/g;
@@ -63,27 +63,45 @@ export async function saveBuild() {
 	const timestamp = Date.now();
 
 	const existing = await env.bucket.get(fileName);
-	const data = existing?.json() || {};
+	const builds = existing ? await existing.json() : [];
 
 	const id = await fetchContent();
 
-	if (data?.[timestamp] != undefined) data[timestamp] = {
+	const existingBuild = builds.find((b: any) => b.hash === id.buildHash);
+
+	if (existingBuild) {
+		return existingBuild;
+	}
+
+	const newBuild = {
 		type: 'READY',
 		hash: id.buildHash,
 		id: id.buildNumber,
 		timestamp
 	};
 
-	await env.bucket.put(fileName, JSON.stringify(data, null, 0));
-	return data[timestamp];
+	builds.unshift(newBuild);
+
+	await env.bucket.put(fileName, JSON.stringify(builds, null, 0));
+	return newBuild;
 }
 
 export async function getStoredBuilds() {
 	const file = await env.bucket.get(fileName);
 
 	if (!file) {
-		return {};
+		return [];
 	}
 
 	return await file.json();
+}
+
+export async function getMostRecentBuild() {
+	const builds = await getStoredBuilds();
+
+	if (!builds || builds.length === 0) {
+		return null;
+	}
+
+	return builds[0];
 }

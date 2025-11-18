@@ -11,11 +11,13 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-import { getBuilds, getStoredBuilds, saveBuild } from './events/plugin';
+import { getMostRecentBuild, getStoredBuilds, saveBuild } from './events/plugin';
+import { env } from 'cloudflare:workers';
 
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
+	async fetch(request): Promise<Response> {
 		const url = new URL(request.url);
+
 		switch (url.pathname) {
 			case '/ws': {
 				const id = env.CHAT.idFromName('room');
@@ -26,21 +28,55 @@ export default {
 				return new Response('Not Found', { status: 404 });
 		}
 	}
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler;
 
 interface ClientData {
 	name?: string;
-	from: "plugin" | "unknown";
+	from: 'plugin' | 'unknown';
 	client: WebSocket;
 }
 
 export class Websocket {
 	private state: DurableObjectState;
 	private clients: ClientData[];
+	private checkIntervalId?: number;
 
 	constructor(state: DurableObjectState) {
 		this.state = state;
 		this.clients = [];
+		this.checkIntervalId = undefined;
+	}
+
+	private startGlobalCheck() {
+		if (this.checkIntervalId !== undefined) {
+			return;
+		}
+
+		this.checkIntervalId = setInterval(async () => {
+			const builds = await getStoredBuilds();
+			const currentBuild = await getMostRecentBuild();
+
+			if (!builds.find(x => x.hash == currentBuild.hash)) {
+				const message = JSON.stringify({ type: 'new_build', data: currentBuild });
+
+				for (const clientData of this.clients) {
+					if (clientData.from === 'plugin') {
+						try {
+							clientData.client.send(message);
+						} catch (e) {
+							console.error('owo uh:', e);
+						}
+					}
+				}
+			}
+		}, 1000 * 60) as unknown as number;
+	}
+
+	private stopGlobalCheck() {
+		if (this.checkIntervalId !== undefined) {
+			clearInterval(this.checkIntervalId);
+			this.checkIntervalId = undefined;
+		}
 	}
 
 	async fetch(request: Request): Promise<Response> {
@@ -50,80 +86,45 @@ export class Websocket {
 
 		const params = new URL(request.url).searchParams;
 		const fromParam = params.get('from');
-		const from: "plugin" | "unknown" = fromParam === "plugin" ? "plugin" : "unknown";
+		const from: 'plugin' | 'unknown' = fromParam === 'plugin' ? 'plugin' : 'unknown';
 
-		if (from == "unknown") {
-			return new Response(null, {
-				status: 400,
-			});
+		if (from == 'unknown') {
+			return new Response(null, { status: 400 });
 		}
 
 		server.accept();
 
-		if (from == "plugin")
-		{
-			const clientData = JSON.stringify(await getStoredBuilds())
-			server.send(clientData)
+		if (from == 'plugin') {
+			await saveBuild();
+			const clientData = await getStoredBuilds();
+			server.send(JSON.stringify({
+				type: 'build',
+				data: Object.values(clientData)[Object.values(clientData).length - 1]
+			}));
+
+			this.startGlobalCheck();
 		}
 
 		this.clients.push({ from, client: server });
 
-		/*server.addEventListener('message', async (event) => {
-			const rawData = event.data;
-			const parsed = JSON.parse(rawData);
+		server.addEventListener('close', () => {
+			this.clients = this.clients.filter(c => c.client !== server);
 
-			/*if (parsed?.type == "builds") {
-				server.send(JSON.stringify({ type: "builds", data: await getBuilds(parsed?.page || 1, parsed?.limit || 100) }));
+			const hasPluginClients = this.clients.some(c => c.from === 'plugin');
+			if (!hasPluginClients) {
+				this.stopGlobalCheck();
 			}
-		})*/
-
-		return new Response(null, {
-			status: 101,
-			webSocket: client
 		});
+
+		server.addEventListener('error', () => {
+			this.clients = this.clients.filter(c => c.client !== server);
+
+			const hasPluginClients = this.clients.some(c => c.from === 'plugin');
+			if (!hasPluginClients) {
+				this.stopGlobalCheck();
+			}
+		});
+
+		return new Response(null, { status: 101, webSocket: client });
 	}
 }
-
-/*const data: ClientData = { name: crypto.randomUUID(), client: server };
-
-this.clients.push(data);
-
-const refresh = () => {
-	for (const ws of this.clients) {
-		ws.client.send(JSON.stringify({ type: 'list', data: this.clients.map(x => x.name) }));
-	}
-};
-
-refresh();
-
-server.addEventListener('message', e => {
-	const rawData = e.data;
-
-	let parsed = JSON.parse(rawData);
-
-	if (parsed?.type === 'message') {
-		const foundClient = this.clients.find(x => x.client === server);
-		const messageData = {
-			type: 'message',
-			name: foundClient?.name || 'Anonymous',
-			data: parsed.data
-		};
-
-		this.clients.forEach(ws => {
-			ws.client.send(JSON.stringify(messageData));
-		});
-	}
-
-	if (parsed?.type === 'change_name') {
-		const foundClient = this.clients.find(x => x.client === server);
-		if (foundClient) {
-			foundClient.name = parsed.data;
-		}
-
-		refresh()
-	}
-});
-
-server.addEventListener('close', () => {
-	this.clients = this.clients.filter(ws => ws.client !== server);
-});*/
